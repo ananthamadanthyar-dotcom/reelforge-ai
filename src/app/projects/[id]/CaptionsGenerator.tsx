@@ -1,87 +1,118 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Type, Download, PlayCircle, Loader2, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Subtitles, Loader2, CheckCircle2, Edit3, AlignLeft } from "lucide-react";
 
-export function CaptionsGenerator({ projectId }: { projectId: string }) {
-  const router = useRouter();
+export function CaptionsGenerator({ projectId, onContinue }: { projectId: string; onContinue?: () => void }) {
   const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [style, setStyle] = useState("hormozi");
+  const [captionsReady, setCaptionsReady] = useState(false);
+  const [captions, setCaptions] = useState<{ time: string, text: string }[]>([]);
+  
+  // State to hold the script so it perfectly matches Tab 1
+  const [scriptText, setScriptText] = useState("The history of Mangalore is filled with secret beaches and incredible spicy food that most tourists never find.");
 
-  async function handleRender() {
+  async function handleGenerateCaptions() {
+    if (!scriptText.trim()) return alert("Please enter a script to transcribe.");
     setLoading(true);
-    // Simulate the final FFmpeg rendering process taking some time
-    await new Promise(resolve => setTimeout(resolve, 4000));
-    setReady(true);
-    setLoading(false);
+    
+    try {
+      const response = await fetch("/api/generate/captions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Send the actual script text to the backend!
+        body: JSON.stringify({ script: scriptText }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "Failed to generate captions");
+      }
+
+      setCaptions(data.captions);
+      setCaptionsReady(true);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="space-y-8">
-      {/* 1. Caption Selection */}
       <div className="p-6 bg-slate-900 border border-slate-800 rounded-xl space-y-6">
-        <h3 className="text-lg font-medium text-white mb-4">Choose Caption Style</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button onClick={() => setStyle("hormozi")} className={`p-4 rounded-xl border text-center transition-all ${style === "hormozi" ? "bg-indigo-600/20 border-indigo-500" : "bg-slate-950 border-slate-800 hover:border-slate-700"}`}>
-            <div className="text-xl font-black italic tracking-tighter text-yellow-400 mb-2 drop-shadow-md">VIRAL</div>
-            <div className="text-xs text-slate-500 mt-1">Bold, colored words (Hormozi style)</div>
-          </button>
-          
-          <button onClick={() => setStyle("minimal")} className={`p-4 rounded-xl border text-center transition-all ${style === "minimal" ? "bg-indigo-600/20 border-indigo-500" : "bg-slate-950 border-slate-800 hover:border-slate-700"}`}>
-            <div className="text-lg font-medium text-white mb-2 font-serif">Minimal</div>
-            <div className="text-xs text-slate-500 mt-1">Clean, cinematic subtitles</div>
-          </button>
-
-          <button onClick={() => setStyle("gaming")} className={`p-4 rounded-xl border text-center transition-all ${style === "gaming" ? "bg-indigo-600/20 border-indigo-500" : "bg-slate-950 border-slate-800 hover:border-slate-700"}`}>
-            <div className="text-lg font-bold text-green-400 mb-2 font-mono uppercase">Pixel</div>
-            <div className="text-xs text-slate-500 mt-1">Fun, bouncy gaming text</div>
-          </button>
+        <div className="flex items-center gap-3 mb-2">
+          <Subtitles className="w-6 h-6 text-indigo-400" />
+          <h3 className="text-xl font-bold text-white">Generate Dynamic Captions</h3>
         </div>
+        
+        <p className="text-slate-400 text-sm">
+          Our AI will listen to the audio you just generated and create perfect word-by-word timestamps for your video.
+        </p>
 
-        <Button onClick={handleRender} disabled={loading || ready} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 mt-4 text-base">
-          {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <PlayCircle className="w-5 h-5 mr-2" />}
-          {loading ? "Rendering Final Video (This takes a moment)..." : "Render Final Video (Costs 2 Credits)"}
-        </Button>
-      </div>
+        {!captionsReady ? (
+          <div className="space-y-4">
+            {/* The Script Input Box */}
+            <div className="p-1 rounded-lg bg-slate-950 border border-slate-800 focus-within:border-indigo-500 transition-colors">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-800/50 text-slate-400">
+                <AlignLeft className="w-4 h-4" />
+                <span className="text-xs font-medium uppercase tracking-wider">Final Script for Transcription</span>
+              </div>
+              <textarea 
+                value={scriptText}
+                onChange={(e) => setScriptText(e.target.value)}
+                className="w-full bg-transparent text-white p-3 min-h-[120px] text-sm focus:outline-none resize-none"
+              />
+            </div>
 
-      {/* 2. Final Output Success State */}
-      {ready && (
-        <div className="p-6 bg-slate-900 border border-emerald-500/30 rounded-xl shadow-[0_0_40px_rgba(16,185,129,0.15)] flex flex-col md:flex-row gap-8 items-center">
-          
-          {/* Fake Video Player Preview */}
-          <div className="w-48 aspect-[9/16] bg-slate-950 border-2 border-slate-800 rounded-lg relative overflow-hidden flex-shrink-0 group">
-             <div className="absolute inset-0 bg-gradient-to-b from-indigo-900/40 to-slate-900/90 flex flex-col items-center justify-center p-4 text-center">
-                <PlayCircle className="w-12 h-12 text-white/80 group-hover:scale-110 transition-transform mb-4" />
-                <span className={`text-xl font-black italic tracking-tighter drop-shadow-md ${style === 'hormozi' ? 'text-yellow-400' : 'text-white'}`}>
-                  AWESOME!
-                </span>
-             </div>
+            <button 
+              onClick={handleGenerateCaptions} 
+              disabled={loading || !scriptText} 
+              className="w-full flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg h-12 font-medium transition-colors"
+            >
+              {loading ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Subtitles className="w-5 h-5 mr-2" />}
+              {loading ? "Transcribing Audio..." : "Auto-Generate Captions"}
+            </button>
           </div>
-
-          <div className="flex-1 space-y-6 text-center md:text-left">
-            <div>
-              <h3 className="text-2xl font-bold text-white flex items-center justify-center md:justify-start gap-2 mb-2">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400" /> Video Rendered!
-              </h3>
-              <p className="text-slate-400">Your video is ready to be published to TikTok, Reels, or Shorts.</p>
+        ) : (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center gap-2 text-emerald-400 font-medium mb-4">
+              <CheckCircle2 className="w-5 h-5" />
+              Captions Generated Successfully
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white h-12 px-6">
-                <Download className="w-5 h-5 mr-2" /> Download MP4
-              </Button>
-              <Button variant="outline" onClick={() => router.push("/dashboard")} className="border-slate-700 bg-transparent text-white h-12 px-6 hover:bg-slate-800">
-                Back to Dashboard
-              </Button>
+            {/* Captions Editor/Preview */}
+            <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3 max-h-64 overflow-y-auto">
+              <div className="flex items-center justify-between text-xs text-slate-500 font-medium uppercase tracking-wider mb-2 pb-2 border-b border-slate-800">
+                <span>Timestamp</span>
+                <span>Caption Text</span>
+                <Edit3 className="w-4 h-4" />
+              </div>
+              
+              {captions.map((cap, i) => (
+                <div key={i} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 group">
+                  <span className="text-xs text-indigo-400 font-mono bg-indigo-400/10 px-2 py-1 rounded w-fit shrink-0">
+                    {cap.time}
+                  </span>
+                  <input 
+                    type="text" 
+                    defaultValue={cap.text}
+                    className="flex-1 bg-transparent border border-transparent hover:border-slate-700 focus:border-indigo-500 rounded px-2 py-1 text-slate-200 outline-none transition-colors"
+                  />
+                </div>
+              ))}
             </div>
-          </div>
 
-        </div>
-      )}
+            <button 
+              onClick={onContinue} 
+              className="w-full flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-12 font-medium transition-colors mt-4"
+            >
+              Approve & Continue to Video Assembly <ArrowRight className="w-5 h-5 ml-2" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

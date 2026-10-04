@@ -3,7 +3,7 @@ export const fetchCache = "force-no-store";
 
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
-import { Sparkles, Video, CreditCard, LogOut, Plus, Clock, Settings, Loader2, CheckCircle2, Play, Layers, Lock, Trash2, Share2 } from "lucide-react";
+import { Sparkles, Video, CreditCard, LogOut, Plus, Clock, Settings, Loader2, CheckCircle2, Play, Layers, Lock, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { deleteProject } from "@/app/actions/project";
@@ -33,8 +33,9 @@ export default async function DashboardPage() {
     orderBy: { createdAt: "desc" }
   });
 
-  const hasActiveSubscription = false; // Set to true once subscription is purchased
-  const allowedSeriesCount = hasActiveSubscription ? 5 : 0; 
+  // Strict check: Change this to evaluate whether the user has purchased a subscription plan (e.g., user.isSubscribed or checking subscription table)
+  const hasActiveSubscription = false; // Set to false by default for new users until they buy a plan
+  const allowedSeriesCount = hasActiveSubscription ? 1 : 0; 
   const activeSeriesCount = userProjects.length;
   
   const canCreateMore = hasActiveSubscription && activeSeriesCount < allowedSeriesCount;
@@ -51,6 +52,7 @@ export default async function DashboardPage() {
 
     if (!actionUser?.id) return;
 
+    // STRICT GATING: If user has no active subscription, redirect them to the pricing page immediately
     if (!hasActiveSubscription) {
       redirect("/pricing");
     }
@@ -82,7 +84,7 @@ export default async function DashboardPage() {
       <header className="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
           <Sparkles className="w-6 h-6 text-indigo-500" />
-          ReelForge AI
+          ReelForge
         </div>
         
         <div className="flex items-center gap-6">
@@ -108,7 +110,7 @@ export default async function DashboardPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
           <div>
             <h1 className="text-3xl font-bold mb-2">Welcome back, {user.name || 'Creator'}</h1>
-            <p className="text-slate-400">Manage your subscription, automated video series, and auto-publishing pipelines.</p>
+            <p className="text-slate-400">Manage your subscription and automated video series.</p>
           </div>
           
           {hasActiveSubscription && canCreateMore ? (
@@ -172,7 +174,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <h2 className="text-xl font-bold mb-6">Active Series & Pipelines</h2>
+        <h2 className="text-xl font-bold mb-6">Active Series</h2>
         
         {userProjects.length === 0 ? (
           <div className="border border-dashed border-slate-800 rounded-2xl p-12 text-center bg-slate-900/30 flex flex-col items-center justify-center">

@@ -1,126 +1,78 @@
-import { auth } from "@/auth";
-import { PrismaClient } from "@prisma/client";
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Sparkles, Film, Music, Type, CheckCircle2 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { ScriptGenerator } from "./ScriptGenerator";
-import { VisualsGenerator } from "./VisualsGenerator";
-import { AudioGenerator } from "./AudioGenerator";
-import { CaptionsGenerator } from "./CaptionsGenerator"; // <-- Imported final step!
+"use client";
 
-const prisma = new PrismaClient();
+import { useState, use } from "react";
+import { NicheGenerator } from "./NicheGenerator";
+import { LanguageVoiceGenerator } from "./LanguageVoiceGenerator";
+import { BackgroundMusicGenerator } from "./BackgroundMusicGenerator";
+import { CaptionStyleGenerator } from "./CaptionStyleGenerator";
+import { EffectsGenerator } from "./EffectsGenerator";
+import { SeriesDetailsGenerator } from "./SeriesDetailsGenerator"; // We will include Socials inside here or right beside it
 
-export default async function ProjectCreatorPage({ 
-  params, 
-  searchParams 
-}: { 
-  params: Promise<{ id: string }>,
-  searchParams: Promise<{ step?: string }>
-}) {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+const STEPS = [
+  "Niche",
+  "Language & Voice",
+  "Background Music",
+  "Caption Style",
+  "Effects",
+  "Socials & Series Details"
+];
 
-  const { id } = await params;
-  const { step } = await searchParams;
-  const currentStep = step || "script"; 
+export default function ProjectWizard({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const projectId = resolvedParams.id;
+  const [currentStep, setCurrentStep] = useState(1);
 
-  const project = await prisma.project.findUnique({
-    where: { id: id, userId: session.user.id }
-  });
-
-  if (!project) redirect("/dashboard");
-
-  const getStepClass = (stepId: string) => {
-    if (currentStep === stepId) {
-      return "px-3 py-2 bg-indigo-500/10 text-indigo-400 rounded-lg font-medium text-sm flex items-center gap-3 border border-indigo-500/20";
-    }
-    return "px-3 py-2 text-slate-500 font-medium text-sm flex items-center gap-3";
+  const handleNext = () => setCurrentStep((prev) => Math.min(prev + 1, 6));
+  const handleBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
+  
+  const handleFinish = () => {
+    console.log("Saving project...");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
-      <header className="h-14 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-900">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-slate-400 hover:text-white")}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Dashboard
-          </Link>
-          <div className="h-4 w-px bg-slate-800"></div>
-          <span className="text-sm font-medium text-slate-300">{project.title}</span> 
+    <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center pt-10">
+      <div className="w-full max-w-4xl px-6">
+        
+        {/* Horizontal Progress Bar (6 Steps Total) */}
+        <div className="flex gap-2 w-full mb-10">
+          {STEPS.map((_, index) => (
+            <div 
+              key={index} 
+              className={`h-2 flex-1 rounded-full transition-colors ${
+                index + 1 <= currentStep ? "bg-purple-600" : "bg-slate-800"
+              }`} 
+            />
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="border-slate-700 bg-transparent text-slate-300">Save Draft</Button>
-        </div>
-      </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="w-64 border-r border-slate-800 bg-slate-900/50 p-4 hidden md:block">
-          <nav className="space-y-1">
-            <div className={getStepClass("script")}>
-              {currentStep === "visuals" || currentStep === "audio" || currentStep === "captions" ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Sparkles className="w-4 h-4" />} 
-              01. Idea & Script
-            </div>
-            <div className={getStepClass("visuals")}>
-              {currentStep === "audio" || currentStep === "captions" ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Film className="w-4 h-4" />} 
-              02. Visuals & Scenes
-            </div>
-            <div className={getStepClass("audio")}>
-              {currentStep === "captions" ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Music className="w-4 h-4" />} 
-              03. Voice & Audio
-            </div>
-            <div className={getStepClass("captions")}>
-              <Type className="w-4 h-4" /> 04. Captions
-            </div>
-          </nav>
-        </aside>
-
-        <main className="flex-1 overflow-y-auto p-6 md:p-12">
-          <div className="max-w-2xl mx-auto space-y-8">
-            
-            {currentStep === "script" && (
-              <>
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 text-white">What is your video about?</h2>
-                  <p className="text-slate-400 text-sm">Enter a topic and our AI will generate a complete script.</p>
-                </div>
-                <ScriptGenerator projectId={project.id} />
-              </>
-            )}
-
-            {currentStep === "visuals" && (
-              <>
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 text-white">Background Visuals</h2>
-                  <p className="text-slate-400 text-sm">Select the visual style for your video.</p>
-                </div>
-                <VisualsGenerator projectId={project.id} />
-              </>
-            )}
-
-            {currentStep === "audio" && (
-              <>
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 text-white">Voiceover & Audio</h2>
-                  <p className="text-slate-400 text-sm">Select a professional AI voice to narrate your video.</p>
-                </div>
-                <AudioGenerator projectId={project.id} />
-              </>
-            )}
-
-            {/* STEP 4 CONTROLS */}
-            {currentStep === "captions" && (
-              <>
-                <div>
-                  <h2 className="text-2xl font-bold mb-2 text-white">Captions & Final Output</h2>
-                  <p className="text-slate-400 text-sm">Pick your subtitle style and render your final masterpiece.</p>
-                </div>
-                <CaptionsGenerator projectId={project.id} />
-              </>
-            )}
-
+        {/* Dynamic Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white">{STEPS[currentStep - 1]}</h1>
+            <span className="px-3 py-1 bg-purple-600/20 text-purple-400 text-xs font-semibold rounded-full border border-purple-500/30">
+              Step {currentStep} of 6
+            </span>
           </div>
-        </main>
+        </div>
+
+        {/* Step Content Rendering (1 through 6) */}
+        <div className="w-full pb-20">
+          {currentStep === 1 && <NicheGenerator onContinue={handleNext} />}
+          {currentStep === 2 && <LanguageVoiceGenerator onBack={handleBack} onContinue={handleNext} />}
+          {currentStep === 3 && <BackgroundMusicGenerator onBack={handleBack} onContinue={handleNext} />}
+          {currentStep === 4 && <CaptionStyleGenerator onBack={handleBack} onContinue={handleNext} />}
+          {currentStep === 5 && <EffectsGenerator onBack={handleBack} onContinue={handleNext} />}
+          
+          {/* Step 6: Combined Social Accounts & Series Details / Watermark */}
+          {currentStep === 6 && (
+            <SeriesDetailsGenerator 
+              projectId={projectId} 
+              onBack={handleBack} 
+              onFinish={handleFinish} 
+            />
+          )}
+        </div>
+
       </div>
     </div>
   );

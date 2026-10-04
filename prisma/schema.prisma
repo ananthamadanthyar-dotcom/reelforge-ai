@@ -21,28 +21,29 @@ enum Plan {
 }
 
 model User {
-  id              String    @id @default(cuid())
-  name            String?
-  email           String?   @unique
-  emailVerified   DateTime?
-  password        String?
-  image           String?
+  id               String       @id @default(cuid())
+  name             String?
+  email            String?      @unique
+  emailVerified    DateTime?
+  password         String?
+  image            String?
   
-  role            Role      @default(USER)
-  plan            Plan      @default(FREE)
-  stripeCustomerId String?  @unique
+  role             Role         @default(USER)
+  plan             Plan         @default(FREE)
+  stripeCustomerId String?      @unique
   
-  premiumOverride Boolean   @default(false)
+  premiumOverride  Boolean      @default(false)
   premiumExpiresAt DateTime?
 
-  accounts        Account[]
-  sessions        Session[]
-  entitlements    Entitlement[]
-  creditBalance   CreditBalance?
-  projects        Project[]
+  accounts         Account[]
+  sessions         Session[]
+  entitlements     Entitlement[]
+  creditBalance    CreditBalance?
+  projects         Project[]
+  series           Series[]     // Added relation to user series
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 model CreditBalance {
@@ -64,6 +65,63 @@ model Entitlement {
   @@unique([userId, feature])
 }
 
+// --- MERGED PROJECT MODEL ---
+model Project {
+  id               String   @id @default(cuid())
+  
+  // Database Relations
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status           String   @default("DRAFT")
+
+  // Step 8: Series Details
+  seriesName       String
+  postingFrequency String?
+  postingTime      String?
+
+  // Step 1 & 2: Niche and Voice
+  niche            String?
+  language         String?
+  voice            String?
+  
+  // Step 3 & 4: Music and Art
+  artStyle         String?
+  musicTracks      String?  
+  
+  // Step 5 & 6: Captions and Effects
+  captionStyle     String?
+  glitchEffect     Boolean  @default(false)
+  animatedHook     Boolean  @default(false)
+  
+  // Step 7: Socials & Watermark
+  youtubeEnabled   Boolean  @default(true)
+  instagramEnabled Boolean  @default(true)
+  tiktokEnabled    Boolean  @default(true)
+  watermarkText    String?
+  watermarkImage   String?  
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// --- SERIES MODEL LINKED TO USER ---
+model Series {
+  id          String   @id @default(cuid())
+  name        String
+  niche       String
+  frequency   String
+  status      String   @default("Active")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- Auth.js Required Tables ---
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -77,7 +135,8 @@ model Account {
   scope             String?
   id_token          String? @db.Text
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -90,12 +149,10 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Project {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
-  status    String   @default("DRAFT")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

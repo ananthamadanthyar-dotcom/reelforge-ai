@@ -6,13 +6,11 @@ const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Get your secret from the .env file
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
     if (!secret) {
       return NextResponse.json({ message: "Webhook secret not set" }, { status: 500 });
     }
 
-    // 2. Get the raw text body (required for cryptographic verification)
     const rawBody = await request.text();
     const signature = request.headers.get("x-signature");
 
@@ -20,60 +18,60 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Missing signature" }, { status: 400 });
     }
 
-    // 3. Create our own hash to compare against Lemon Squeezy's hash
     const hmac = crypto.createHmac("sha256", secret);
     const digest = Buffer.from(hmac.update(rawBody).digest("hex"), "utf8");
     const signatureBuffer = Buffer.from(signature, "utf8");
 
-    // Prevent timing attacks and crashes by comparing lengths first
     if (digest.length !== signatureBuffer.length || !crypto.timingSafeEqual(digest, signatureBuffer)) {
       return NextResponse.json({ message: "Invalid signature" }, { status: 403 });
     }
 
-    // 4. If we reach here, the request is 100% authentically from Lemon Squeezy!
     const payload = JSON.parse(rawBody);
     const eventName = payload.meta.event_name;
-    const customData = payload.meta.custom_data; // This holds our user_id!
+    const customData = payload.meta.custom_data; 
 
-    // 5. Handle successful payments
     if (eventName === "order_created" || eventName === "subscription_payment_success") {
       const userId = customData?.user_id;
       
-      // Lemon Squeezy hides the variant_id in different places depending on if it's a subscription or order
       const variantId = payload.data.attributes.variant_id || payload.data.attributes.first_order_item?.variant_id;
+      const seriesQuantity = payload.data.attributes.first_order_item?.quantity || payload.data.attributes.quantity || 1;
 
       if (userId) {
-        // Map the variant they bought to the credits they deserve
-        let creditsToAdd = 500; // Default to Creator plan
-        let newPlan = "CREATOR";
+        let baseCredits = 500; 
+        let newPlan = "HOBBY";
 
-        if (variantId === "pro_variant_456" || variantId == 456) {
-          creditsToAdd = 2000;
+        // Map Monthly & Yearly Variant IDs
+        // Daily Variants: Monthly (1389874) | Yearly (1408356)
+        if (variantId == 1389874 || variantId == 1408356 || variantId === "1389874" || variantId === "1408356") {
+          baseCredits = 2000;
+          newPlan = "DAILY";
+        } 
+        // Pro Variants: Monthly (1389882) | Yearly (1408360)
+        else if (variantId == 1389882 || variantId == 1408360 || variantId === "1389882" || variantId === "1408360") {
+          baseCredits = 5000;
           newPlan = "PRO";
-        } else if (variantId === "business_variant_789" || variantId == 789) {
-          creditsToAdd = 5000;
-          newPlan = "BUSINESS";
         }
+        // Hobby Variants: Monthly (1389864) | Yearly (1408350) covers default
 
-        // Add the credits and update their plan level simultaneously!
+        const totalCreditsToAdd = baseCredits * seriesQuantity;
+
         await prisma.user.update({
           where: { id: userId },
           data: { 
             plan: newPlan as any,
             creditBalance: {
               upsert: {
-                update: { amount: { increment: creditsToAdd } },
-                create: { amount: creditsToAdd }
+                update: { amount: { increment: totalCreditsToAdd } },
+                create: { amount: totalCreditsToAdd }
               }
             }
           }
         });
         
-        console.log(`Successfully added ${creditsToAdd} credits to user ${userId}`);
+        console.log(`Successfully added ${totalCreditsToAdd} credits to user ${userId} for ${seriesQuantity} series (${newPlan})`);
       }
     }
 
-    // 6. Tell Lemon Squeezy we received it successfully so they don't retry
     return NextResponse.json({ message: "Webhook processed successfully" }, { status: 200 });
     
   } catch (error) {

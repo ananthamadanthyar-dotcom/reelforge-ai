@@ -1,27 +1,33 @@
 "use server";
 
-import { auth } from "@/auth";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-const prisma = new PrismaClient();
-
-export async function createProject() {
-  const session = await auth();
-  
-  if (!session?.user?.id) {
-    throw new Error("Unauthorized");
-  }
-
-  // Create a blank Draft project in the database
-  const project = await prisma.project.create({
+export async function finalizeProject(
+  projectId: string, 
+  seriesName: string, 
+  watermarkImage: string | null,
+  watermarkText: string | null
+) {
+  await prisma.project.update({
+    where: { id: projectId },
     data: {
-      userId: session.user.id,
-      title: "Untitled Video",
-      status: "DRAFT"
+      seriesName,
+      watermarkImage,
+      status: "GENERATING"
     }
   });
 
-  // Redirect the user straight into the editor
-  redirect(`/projects/${project.id}`);
+  revalidatePath("/dashboard");
+  redirect(`/projects/${projectId}/manage`);
+}
+
+export async function deleteProject(projectId: string) {
+  await prisma.project.delete({
+    where: { id: projectId }
+  });
+  
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
 }
